@@ -77,16 +77,21 @@ export default function UserManagement() {
         }
         
         if (authData.user) {
-          // Wait a moment for the Supabase trigger to create the initial profile
+          // Wait a moment for the Supabase trigger to run
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-          // Update the profile with the selected role
-          const { error: updateError } = await supabase
+          // Use UPSERT instead of update. 
+          // This guarantees the profile is created even if the database trigger fails!
+          const { error: upsertError } = await supabase
             .from('profiles')
-            .update({ role: formData.role })
-            .eq('id', authData.user.id);
+            .upsert({ 
+              id: authData.user.id,
+              email: formData.email,
+              name: formData.name,
+              role: formData.role 
+            });
             
-          if (updateError) console.error('Error updating role:', updateError);
+          if (upsertError) console.error('Error upserting profile:', upsertError);
         }
       }
       setIsModalOpen(false);
