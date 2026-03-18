@@ -22,12 +22,30 @@ export default function Dashboard() {
         const { count: recipientsCount } = await supabase.from('recipients').select('*', { count: 'exact', head: true });
         const { count: distributionsCount } = await supabase.from('distributions').select('*', { count: 'exact', head: true });
         
+        const { data: recentData } = await supabase
+          .from('distributions')
+          .select(`
+            id,
+            date_distributed,
+            quantity,
+            recipients (first_name, last_name),
+            inventory (name)
+          `)
+          .order('date_distributed', { ascending: false })
+          .limit(5);
+        
         if (inventoryCount !== null) {
           setStats({
             totalInventory: inventoryCount || 0,
             totalRecipients: recipientsCount || 0,
             totalDistributions: distributionsCount || 0,
-            recentDistributions: dummyStats.recentDistributions
+            recentDistributions: (recentData || []).map((d: any) => ({
+              id: d.id,
+              date: new Date(d.date_distributed).toLocaleDateString(),
+              recipient: `${d.recipients?.first_name || ''} ${d.recipients?.last_name || ''}`.trim(),
+              item: d.inventory?.name || 'Unknown Item',
+              qty: d.quantity
+            }))
           });
           return;
         }

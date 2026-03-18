@@ -21,7 +21,7 @@ export default function Recipients() {
     municipality: '',
     province: '',
     contact_number: '',
-    farm_area_hectares: 0,
+    farm_area_hectares: '' as string | number,
     commodity: ''
   });
 
@@ -52,16 +52,21 @@ export default function Recipients() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...formData,
+        farm_area_hectares: Number(formData.farm_area_hectares) || 0
+      };
+      
       if (editingItem) {
         const { error } = await supabase
           .from('recipients')
-          .update(formData)
+          .update(payload)
           .eq('id', editingItem.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('recipients')
-          .insert([formData]);
+          .insert([payload]);
         if (error) throw error;
       }
       setIsModalOpen(false);
@@ -113,7 +118,7 @@ export default function Recipients() {
         municipality: '',
         province: '',
         contact_number: '',
-        farm_area_hectares: 0,
+        farm_area_hectares: '',
         commodity: ''
       });
     }
@@ -219,14 +224,13 @@ export default function Recipients() {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75" onClick={() => setIsModalOpen(false)}></div>
-            </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <form onSubmit={handleSubmit}>
+        <div className="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-gray-500 opacity-75 transition-opacity" onClick={() => setIsModalOpen(false)}></div>
+
+          <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+                <form onSubmit={handleSubmit}>
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -332,7 +336,7 @@ export default function Recipients() {
                         step="0.01"
                         min="0"
                         value={formData.farm_area_hectares}
-                        onChange={(e) => setFormData({...formData, farm_area_hectares: parseFloat(e.target.value)})}
+                        onChange={(e) => setFormData({...formData, farm_area_hectares: e.target.value})}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                       />
                     </div>
@@ -367,6 +371,7 @@ export default function Recipients() {
               </form>
             </div>
           </div>
+        </div>
         </div>
       )}
     </div>

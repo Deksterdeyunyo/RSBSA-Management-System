@@ -14,7 +14,7 @@ export default function Distribute() {
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   
   const [selectedItem, setSelectedItem] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<string | number>('');
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,13 +53,14 @@ export default function Distribute() {
 
   const handleDistribute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRecipient || !selectedItem || quantity <= 0) {
+    const numQuantity = Number(quantity);
+    if (!selectedRecipient || !selectedItem || !numQuantity || numQuantity <= 0) {
       alert('Please fill all required fields correctly.');
       return;
     }
 
     const item = inventory.find(i => i.id === selectedItem);
-    if (!item || item.quantity < quantity) {
+    if (!item || item.quantity < numQuantity) {
       alert('Insufficient inventory quantity.');
       return;
     }
@@ -72,7 +73,7 @@ export default function Distribute() {
         .insert([{
           recipient_id: selectedRecipient.id,
           inventory_id: selectedItem,
-          quantity,
+          quantity: numQuantity,
           date_distributed: new Date().toISOString(),
           distributed_by: user?.id,
           remarks
@@ -83,7 +84,7 @@ export default function Distribute() {
       // 2. Update inventory
       const { error: invError } = await supabase
         .from('inventory')
-        .update({ quantity: item.quantity - quantity })
+        .update({ quantity: item.quantity - numQuantity })
         .eq('id', selectedItem);
 
       if (invError) throw invError;
@@ -94,7 +95,7 @@ export default function Distribute() {
       setSelectedRecipient(null);
       setSearchRecipient('');
       setSelectedItem('');
-      setQuantity(1);
+      setQuantity('');
       setRemarks('');
       
       // Refresh data
@@ -225,7 +226,7 @@ export default function Distribute() {
                   step="0.01"
                   max={selectedItem ? inventory.find(i => i.id === selectedItem)?.quantity : undefined}
                   value={quantity}
-                  onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                  onChange={(e) => setQuantity(e.target.value)}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                 />
               </div>
