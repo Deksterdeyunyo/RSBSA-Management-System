@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Recipient, InventoryItem } from '../types';
-import { Search, Check } from 'lucide-react';
+import { Search, Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Distribute() {
@@ -16,6 +16,9 @@ export default function Distribute() {
   const [selectedItem, setSelectedItem] = useState('');
   const [quantity, setQuantity] = useState<string | number>('');
   const [remarks, setRemarks] = useState('');
+  
+  const [distributionItems, setDistributionItems] = useState<{inventory_id: string, name: string, quantity: number, unit: string, maxQty: number}[]>([]);
+  
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -51,17 +54,62 @@ export default function Distribute() {
     }
   };
 
-  const handleDistribute = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddItem = () => {
     const numQuantity = Number(quantity);
-    if (!selectedRecipient || !selectedItem || !numQuantity || numQuantity <= 0) {
-      alert('Please fill all required fields correctly.');
+    if (!selectedItem || !numQuantity || numQuantity <= 0) {
+      alert('Please select an item and enter a valid quantity.');
       return;
     }
 
     const item = inventory.find(i => i.id === selectedItem);
-    if (!item || item.quantity < numQuantity) {
-      alert('Insufficient inventory quantity.');
+    if (!item) return;
+
+    // Check if item already exists in the list
+    const existingItemIndex = distributionItems.findIndex(i => i.inventory_id === selectedItem);
+    let totalQty = numQuantity;
+    if (existingItemIndex >= 0) {
+      totalQty += distributionItems[existingItemIndex].quantity;
+    }
+
+    if (totalQty > item.quantity) {
+      alert(`Insufficient inventory. Only ${item.quantity} ${item.unit} available.`);
+      return;
+    }
+
+    if (existingItemIndex >= 0) {
+      const newItems = [...distributionItems];
+      newItems[existingItemIndex].quantity = totalQty;
+      setDistributionItems(newItems);
+    } else {
+      setDistributionItems([...distributionItems, {
+        inventory_id: item.id,
+        name: item.name,
+        quantity: numQuantity,
+        unit: item.unit,
+        maxQty: item.quantity
+      }]);
+    }
+
+    setSelectedItem('');
+    setQuantity('');
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = [...distributionItems];
+    newItems.splice(index, 1);
+    setDistributionItems(newItems);
+  };
+
+  const handleDistribute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedRecipient) {
+      alert('Please select a recipient.');
+      return;
+    }
+
+    if (distributionItems.length === 0) {
+      alert('Please add at least one item to distribute.');
       return;
     }
 
@@ -85,27 +133,37 @@ export default function Distribute() {
         }
       }
 
-      // 1. Record distribution
+      const dateDistributed = new Date().toISOString();
+
+      // Prepare distribution records
+      const distributionRecords = distributionItems.map(item => ({
+        recipient_id: selectedRecipient.id,
+        inventory_id: item.inventory_id,
+        quantity: item.quantity,
+        date_distributed: dateDistributed,
+        distributed_by: user?.id,
+        remarks
+      }));
+
+      // 1. Record distributions
       const { error: distError } = await supabase
         .from('distributions')
-        .insert([{
-          recipient_id: selectedRecipient.id,
-          inventory_id: selectedItem,
-          quantity: numQuantity,
-          date_distributed: new Date().toISOString(),
-          distributed_by: user?.id,
-          remarks
-        }]);
+        .insert(distributionRecords);
 
       if (distError) throw distError;
 
-      // 2. Update inventory
-      const { error: invError } = await supabase
-        .from('inventory')
-        .update({ quantity: item.quantity - numQuantity })
-        .eq('id', selectedItem);
-
-      if (invError) throw invError;
+      // 2. Update inventory (needs to be done sequentially or via RPC, doing sequentially for simplicity here)
+      for (const item of distributionItems) {
+        const invItem = inventory.find(i => i.id === item.inventory_id);
+        if (invItem) {
+          const { error: invError } = await supabase
+            .from('inventory')
+            .update({ quantity: invItem.quantity - item.quantity })
+            .eq('id', item.inventory_id);
+            
+          if (invError) console.error('Error updating inventory for item:', item.name, invError);
+        }
+      }
 
       alert('Distribution recorded successfully!');
       
@@ -115,6 +173,7 @@ export default function Distribute() {
       setSelectedItem('');
       setQuantity('');
       setRemarks('');
+      setDistributionItems([]);
       
       // Refresh data
       fetchData();
@@ -213,15 +272,14 @@ export default function Distribute() {
 
           <hr className="border-gray-200" />
 
-          {/* Step 2: Select Item & Quantity */}
+          {/* Step 2: Select Items */}
           <div className={!selectedRecipient ? 'opacity-50 pointer-events-none' : ''}>
             <h3 className="text-lg font-medium text-gray-900 mb-4">2. Distribution Details</h3>
             
-            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-              <div className="sm:col-span-4">
+            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6 items-end mb-6">
+              <div className="sm:col-span-3">
                 <label className="block text-sm font-medium text-gray-700">Inventory Item</label>
                 <select
-                  required
                   value={selectedItem}
                   onChange={(e) => setSelectedItem(e.target.value)}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
@@ -239,7 +297,6 @@ export default function Distribute() {
                 <label className="block text-sm font-medium text-gray-700">Quantity</label>
                 <input
                   type="number"
-                  required
                   min="0.01"
                   step="0.01"
                   max={selectedItem ? inventory.find(i => i.id === selectedItem)?.quantity : undefined}
@@ -249,6 +306,52 @@ export default function Distribute() {
                 />
               </div>
 
+              <div className="sm:col-span-1">
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  disabled={!selectedItem || !quantity}
+                  className="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-emerald-700 bg-emerald-100 hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
+                >
+                  <Plus className="h-5 w-5" />
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {/* Added Items List */}
+            {distributionItems.length > 0 && (
+              <div className="mb-6 border rounded-md overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {distributionItems.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{item.quantity} {item.unit}</td>
+                        <td className="px-4 py-3 text-right text-sm font-medium">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(index)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div className="sm:col-span-6">
                 <label className="block text-sm font-medium text-gray-700">Remarks (Optional)</label>
                 <textarea
@@ -266,7 +369,7 @@ export default function Distribute() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={!selectedRecipient || !selectedItem || submitting}
+                disabled={!selectedRecipient || distributionItems.length === 0 || submitting}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
               >
                 {submitting ? 'Recording...' : 'Record Distribution'}

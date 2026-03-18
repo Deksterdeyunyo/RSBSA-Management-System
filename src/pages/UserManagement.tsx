@@ -64,7 +64,10 @@ export default function UserManagement() {
           // If the RPC fails (e.g., function not created yet), fallback to standard signUp
           console.warn('RPC create_user failed, falling back to standard signUp:', createError);
           
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError) {
+            console.warn('Could not get current session:', sessionError);
+          }
           
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email: formData.email,

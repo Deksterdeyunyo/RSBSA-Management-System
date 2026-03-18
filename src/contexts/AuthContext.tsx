@@ -16,16 +16,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
-      } else {
+    const initSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session error:', error.message);
+          // If there's an error (like invalid refresh token), clear the session
+          await supabase.auth.signOut().catch(() => {});
+          // Force clear local storage just in case
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              localStorage.removeItem(key);
+            }
+          });
+          setLoading(false);
+          return;
+        }
+        
+        if (session?.user) {
+          fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Unexpected session error:', err);
+        await supabase.auth.signOut().catch(() => {});
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
         setLoading(false);
       }
-    });
+    };
+    
+    initSession();
 
     // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event as string) === 'TOKEN_REFRESH_FAILED') {
+        console.error('Token refresh failed, clearing session');
+        await supabase.auth.signOut().catch(() => {});
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       if (session?.user) {
         fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
       } else {

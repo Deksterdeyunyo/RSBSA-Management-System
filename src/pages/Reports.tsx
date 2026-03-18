@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, Printer, FileText, BarChart2 } from 'lucide-react';
+import { Download, Printer, FileText, BarChart2, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,27 +9,74 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('inventory');
   const [data, setData] = useState<any[]>([]);
+  
+  // Filter states
+  const [categories, setCategories] = useState<string[]>([]);
+  const [barangays, setBarangays] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedBarangay, setSelectedBarangay] = useState('');
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
 
   useEffect(() => {
     fetchReportData();
-  }, [reportType]);
+  }, [reportType, selectedCategory, selectedBarangay]);
+
+  const fetchFilterOptions = async () => {
+    try {
+      // Fetch unique categories
+      const { data: invData } = await supabase.from('inventory').select('category');
+      if (invData) {
+        const uniqueCategories = Array.from(new Set(invData.map(item => item.category))).filter(Boolean);
+        setCategories(uniqueCategories as string[]);
+      }
+
+      // Fetch unique barangays
+      const { data: recData } = await supabase.from('recipients').select('barangay');
+      if (recData) {
+        const uniqueBarangays = Array.from(new Set(recData.map(item => item.barangay))).filter(Boolean);
+        setBarangays(uniqueBarangays as string[]);
+      }
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  };
 
   const fetchReportData = async () => {
     setLoading(true);
     try {
       if (reportType === 'inventory') {
-        const { data: invData, error } = await supabase.from('inventory').select('*').order('category');
+        let query = supabase.from('inventory').select('*').order('category');
+        if (selectedCategory) {
+          query = query.eq('category', selectedCategory);
+        }
+        const { data: invData, error } = await query;
         if (error) throw error;
         setData(invData || []);
       } else if (reportType === 'recipients') {
-        const { data: recData, error } = await supabase.from('recipients').select('*').order('barangay');
+        let query = supabase.from('recipients').select('*').order('barangay');
+        if (selectedBarangay) {
+          query = query.eq('barangay', selectedBarangay);
+        }
+        const { data: recData, error } = await query;
         if (error) throw error;
         setData(recData || []);
       } else if (reportType === 'summary') {
         // Group distributions by category
-        const { data: distData, error } = await supabase
+        let query = supabase
           .from('distributions')
-          .select('quantity, inventory(category, name)');
+          .select('quantity, inventory!inner(category, name), recipients!inner(barangay)');
+          
+        if (selectedCategory) {
+          query = query.eq('inventory.category', selectedCategory);
+        }
+        if (selectedBarangay) {
+          query = query.eq('recipients.barangay', selectedBarangay);
+        }
+
+        const { data: distData, error } = await query;
         if (error) throw error;
         
         // Aggregate data
@@ -40,6 +87,48 @@ export default function Reports() {
         });
         
         setData(Object.entries(summary).map(([category, total]) => ({ category, total })));
+      } else if (reportType === 'recipient_distributions') {
+        let query = supabase
+          .from('distributions')
+          .select('quantity, inventory!inner(category, name, unit), recipients!inner(rsbsa_number, first_name, last_name, barangay)');
+          
+        if (selectedCategory) {
+          query = query.eq('inventory.category', selectedCategory);
+        }
+        if (selectedBarangay) {
+          query = query.eq('recipients.barangay', selectedBarangay);
+        }
+
+        const { data: distData, error } = await query;
+        if (error) throw error;
+        
+        // Aggregate data by recipient and item
+        const summary: Record<string, any> = {};
+        (distData || []).forEach((d: any) => {
+          const rec = d.recipients;
+          const inv = d.inventory;
+          const key = `${rec.rsbsa_number}_${inv.category}_${inv.name}`;
+          
+          if (!summary[key]) {
+            summary[key] = {
+              rsbsa_number: rec.rsbsa_number,
+              name: `${rec.last_name}, ${rec.first_name}`,
+              barangay: rec.barangay,
+              category: inv.category,
+              item_name: inv.name,
+              unit: inv.unit,
+              total_quantity: 0
+            };
+          }
+          summary[key].total_quantity += d.quantity;
+        });
+        
+        const aggregatedData = Object.values(summary).sort((a: any, b: any) => {
+          if (a.name !== b.name) return a.name.localeCompare(b.name);
+          return a.category.localeCompare(b.category);
+        });
+        
+        setData(aggregatedData);
       }
     } catch (error) {
       console.error('Error fetching report data:', error);
@@ -55,6 +144,20 @@ export default function Reports() {
     doc.text(`MAO RSBSA - ${reportType.toUpperCase()} REPORT`, 14, 22);
     doc.setFontSize(11);
     doc.text(`Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`, 14, 30);
+    
+    let filterText = '';
+    if (reportType === 'inventory' && selectedCategory) filterText = `Category: ${selectedCategory}`;
+    if (reportType === 'recipients' && selectedBarangay) filterText = `Barangay: ${selectedBarangay}`;
+    if (reportType === 'summary' || reportType === 'recipient_distributions') {
+      const filters = [];
+      if (selectedCategory) filters.push(`Category: ${selectedCategory}`);
+      if (selectedBarangay) filters.push(`Barangay: ${selectedBarangay}`);
+      filterText = filters.join(' | ');
+    }
+    
+    if (filterText) {
+      doc.text(`Filters: ${filterText}`, 14, 36);
+    }
 
     let head: string[][] = [];
     let body: any[][] = [];
@@ -68,12 +171,15 @@ export default function Reports() {
     } else if (reportType === 'summary') {
       head = [['Category', 'Total Distributed Quantity']];
       body = data.map(item => [item.category, item.total]);
+    } else if (reportType === 'recipient_distributions') {
+      head = [['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty']];
+      body = data.map(item => [item.rsbsa_number, item.name, item.barangay, item.category, item.item_name, `${item.total_quantity} ${item.unit}`]);
     }
 
     autoTable(doc, {
       head: head,
       body: body,
-      startY: 40,
+      startY: filterText ? 42 : 36,
       theme: 'grid',
       headStyles: { fillColor: [5, 150, 105] }
     });
@@ -94,6 +200,9 @@ export default function Reports() {
     } else if (reportType === 'summary') {
       headers = ['Category', 'Total Distributed Quantity'];
       csvData = data.map(item => [item.category, item.total]);
+    } else if (reportType === 'recipient_distributions') {
+      headers = ['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty'];
+      csvData = data.map(item => [item.rsbsa_number, `"${item.name}"`, `"${item.barangay}"`, item.category, `"${item.item_name}"`, `${item.total_quantity} ${item.unit}`]);
     }
 
     const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
@@ -130,7 +239,10 @@ export default function Reports() {
                     name="reportType"
                     value="inventory"
                     checked={reportType === 'inventory'}
-                    onChange={(e) => setReportType(e.target.value)}
+                    onChange={(e) => {
+                      setReportType(e.target.value);
+                      setSelectedBarangay(''); // Clear barangay filter when switching to inventory
+                    }}
                     className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
                   />
                   <span className="ml-3 flex flex-col">
@@ -145,7 +257,10 @@ export default function Reports() {
                     name="reportType"
                     value="recipients"
                     checked={reportType === 'recipients'}
-                    onChange={(e) => setReportType(e.target.value)}
+                    onChange={(e) => {
+                      setReportType(e.target.value);
+                      setSelectedCategory(''); // Clear category filter when switching to recipients
+                    }}
                     className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
                   />
                   <span className="ml-3 flex flex-col">
@@ -168,7 +283,62 @@ export default function Reports() {
                     <span className="block text-xs text-gray-500">Aggregated distribution totals</span>
                   </span>
                 </label>
+
+                <label className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="reportType"
+                    value="recipient_distributions"
+                    checked={reportType === 'recipient_distributions'}
+                    onChange={(e) => setReportType(e.target.value)}
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                  />
+                  <span className="ml-3 flex flex-col">
+                    <span className="block text-sm font-medium text-gray-900">Distribution by Recipient</span>
+                    <span className="block text-xs text-gray-500">Aggregated items per farmer</span>
+                  </span>
+                </label>
               </div>
+            </div>
+
+            {/* Filters */}
+            <div className="pt-4 border-t border-gray-200 space-y-3">
+              <h4 className="text-sm font-medium text-gray-900 flex items-center">
+                <Filter className="h-4 w-4 mr-1 text-gray-500" />
+                Filters
+              </h4>
+              
+              {['inventory', 'summary', 'recipient_distributions'].includes(reportType) && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {['recipients', 'summary', 'recipient_distributions'].includes(reportType) && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Barangay</label>
+                  <select
+                    value={selectedBarangay}
+                    onChange={(e) => setSelectedBarangay(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  >
+                    <option value="">All Barangays</option>
+                    {barangays.map(brgy => (
+                      <option key={brgy} value={brgy}>{brgy}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-gray-200 space-y-3">
@@ -233,6 +403,14 @@ export default function Reports() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Distributed</th>
                       </>
                     )}
+                    {reportType === 'recipient_distributions' && (
+                      <>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barangay</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -256,6 +434,17 @@ export default function Reports() {
                         <>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.category}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{item.total}</td>
+                        </>
+                      )}
+                      {reportType === 'recipient_distributions' && (
+                        <>
+                          <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.barangay}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            <div className="font-medium">{item.item_name}</div>
+                            <div className="text-xs text-gray-500">{item.category}</div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{item.total_quantity} {item.unit}</td>
                         </>
                       )}
                     </tr>
