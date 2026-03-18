@@ -52,36 +52,74 @@ export default function UserManagement() {
           .eq('id', editingUser.id);
         if (error) throw error;
       } else {
-        // Create auth user (requires admin privileges or edge function in real app)
-        // For demo, we'll just show an alert
-        alert('In a real app, this would create an auth user and a profile via Supabase Edge Functions or Admin API.');
+        // Save current session to restore it after signUp
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         
-        // Simulate adding to list
-        const newUser: User = {
-          id: Math.random().toString(),
+        // Create auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
-          name: formData.name,
-          role: formData.role,
-          created_at: new Date().toISOString()
-        };
-        setUsers([...users, newUser]);
+          password: formData.password,
+          options: {
+            data: {
+              full_name: formData.name,
+            }
+          }
+        });
+        
+        if (authError) throw authError;
+        
+        // Restore admin session to prevent being logged out
+        if (currentSession) {
+          await supabase.auth.setSession({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token
+          });
+        }
+        
+        if (authData.user) {
+          // Wait a moment for the Supabase trigger to create the initial profile
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Update the profile with the selected role
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ role: formData.role })
+            .eq('id', authData.user.id);
+            
+          if (updateError) console.error('Error updating role:', updateError);
+        }
       }
       setIsModalOpen(false);
-      // fetchUsers();
-    } catch (error) {
+      fetchUsers();
+    } catch (error: any) {
       console.error('Error saving user:', error);
-      alert('Failed to save user.');
+      alert(`Failed to save user: ${error.message || 'Unknown error'}`);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    if (!window.confirm('Are you sure you want to delete this user completely?')) return;
     try {
-      // Deleting auth user requires admin API
-      alert('In a real app, this would delete the auth user via Supabase Admin API.');
+      // Call the secure RPC function to delete the user from auth.users
+      // This will automatically cascade and delete their profile too
+      const { error } = await supabase.rpc('delete_user', { user_id: id });
+        
+      if (error) {
+        // Fallback if the RPC function hasn't been created yet
+        console.warn('RPC failed, falling back to profile deletion:', error);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', id);
+          
+        if (profileError) throw profileError;
+      }
+      
+      // Update local state
       setUsers(users.filter(u => u.id !== id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting user:', error);
+      alert(`Failed to delete user: ${error.message || 'Unknown error'}`);
     }
   };
 
