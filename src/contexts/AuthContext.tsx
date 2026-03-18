@@ -18,7 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
       } else {
         setLoading(false);
       }
@@ -27,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
       } else {
         setUser(null);
         setLoading(false);
@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, email?: string, name?: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -45,17 +45,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          const newProfile = {
+            id: userId,
+            email: email || 'user@example.com',
+            name: name || email?.split('@')[0] || 'User',
+            role: 'ADMIN' // Default to ADMIN for development
+          };
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([newProfile])
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          setUser(createdProfile as User);
+          return;
+        }
+        throw error;
+      }
       
       setUser(data as User);
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      // Fallback for development if profile doesn't exist
+      console.error('Error fetching/creating profile:', error);
+      // Fallback for development if profile creation fails
       setUser({
         id: userId,
-        email: 'dev@example.com',
+        email: email || 'dev@example.com',
         role: 'ADMIN',
-        name: 'Dev Admin',
+        name: name || 'Dev Admin',
         created_at: new Date().toISOString()
       });
     } finally {

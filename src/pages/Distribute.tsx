@@ -67,6 +67,24 @@ export default function Distribute() {
 
     setSubmitting(true);
     try {
+      // Ensure user profile exists (fallback for development)
+      if (user?.id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+          
+        if (!profileData) {
+          await supabase.from('profiles').insert([{
+            id: user.id,
+            email: user.email || 'dev@example.com',
+            name: user.name || 'Dev User',
+            role: user.role || 'ADMIN'
+          }]);
+        }
+      }
+
       // 1. Record distribution
       const { error: distError } = await supabase
         .from('distributions')
