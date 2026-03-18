@@ -11,6 +11,7 @@ export default function DistributionLog() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   useEffect(() => {
     fetchLogs();
@@ -48,8 +49,9 @@ export default function DistributionLog() {
       log.recipient?.rsbsa_number.toLowerCase().includes(searchLower);
       
     const matchesDate = dateFilter ? log.date_distributed.startsWith(dateFilter) : true;
+    const matchesCategory = categoryFilter ? log.inventory?.category === categoryFilter : true;
     
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesDate && matchesCategory;
   });
 
   const handleExportCSV = () => {
@@ -148,7 +150,22 @@ export default function DistributionLog() {
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
             />
           </div>
-          <div className="sm:w-64">
+          <div className="sm:w-48">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm rounded-md"
+            >
+              <option value="">All Categories</option>
+              <option value="SEEDS">Seeds</option>
+              <option value="FERTILIZER_ORGANIC">Organic Fertilizer</option>
+              <option value="FERTILIZER_INORGANIC">Inorganic Fertilizer</option>
+              <option value="DEWORMING">Deworming</option>
+              <option value="ANTI_RABIES">Anti-Rabies</option>
+              <option value="PESTICIDES">Pesticides</option>
+            </select>
+          </div>
+          <div className="sm:w-48">
             <input
               type="date"
               value={dateFilter}
