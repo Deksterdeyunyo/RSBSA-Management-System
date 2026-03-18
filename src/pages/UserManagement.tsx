@@ -52,46 +52,47 @@ export default function UserManagement() {
           .eq('id', editingUser.id);
         if (error) throw error;
       } else {
-        // Save current session to restore it after signUp
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        
-        // Create auth user
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              full_name: formData.name,
-            }
-          }
+        // Create new user securely via RPC (bypasses email confirmation and prevents admin logout)
+        const { error: createError } = await supabase.rpc('create_user', {
+          user_email: formData.email,
+          user_password: formData.password,
+          user_name: formData.name,
+          user_role: formData.role
         });
         
-        if (authError) throw authError;
-        
-        // Restore admin session to prevent being logged out
-        if (currentSession) {
-          await supabase.auth.setSession({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token
-          });
-        }
-        
-        if (authData.user) {
-          // Wait a moment for the Supabase trigger to run
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        if (createError) {
+          // If the RPC fails (e.g., function not created yet), fallback to standard signUp
+          console.warn('RPC create_user failed, falling back to standard signUp:', createError);
           
-          // Use UPSERT instead of update. 
-          // This guarantees the profile is created even if the database trigger fails!
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({ 
-              id: authData.user.id,
-              email: formData.email,
-              name: formData.name,
-              role: formData.role 
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+            options: { data: { full_name: formData.name } }
+          });
+          
+          if (authError) throw authError;
+          
+          if (currentSession) {
+            await supabase.auth.setSession({
+              access_token: currentSession.access_token,
+              refresh_token: currentSession.refresh_token
             });
-            
-          if (upsertError) console.error('Error upserting profile:', upsertError);
+          }
+          
+          if (authData.user) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const { error: upsertError } = await supabase
+              .from('profiles')
+              .upsert({ 
+                id: authData.user.id,
+                email: formData.email,
+                name: formData.name,
+                role: formData.role 
+              });
+            if (upsertError) console.error('Error upserting profile:', upsertError);
+          }
         }
       }
       setIsModalOpen(false);
