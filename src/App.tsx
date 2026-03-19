@@ -49,11 +49,19 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="recipients" element={<Recipients />} />
-            <Route path="distribute" element={<Distribute />} />
+            <Route path="distribute" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'STAFF', 'ENCODER']}>
+                <Distribute />
+              </ProtectedRoute>
+            } />
             <Route path="logs" element={<DistributionLog />} />
-            <Route path="reports" element={<Reports />} />
+            <Route path="reports" element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'STAFF', 'VIEWER']}>
+                <Reports />
+              </ProtectedRoute>
+            } />
             <Route path="users" element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['ADMIN']}>
                 <UserManagement />
               </ProtectedRoute>
             } />

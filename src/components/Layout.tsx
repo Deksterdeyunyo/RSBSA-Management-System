@@ -31,14 +31,16 @@ export default function Layout() {
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Inventory', path: '/inventory', icon: Package },
-    { name: 'Recipients', path: '/recipients', icon: Users },
-    { name: 'Distribute', path: '/distribute', icon: ClipboardList },
-    { name: 'Distribution Log', path: '/logs', icon: FileText },
-    { name: 'Reports', path: '/reports', icon: FileText },
-    { name: 'User Management', path: '/users', icon: Settings },
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['ADMIN', 'STAFF', 'ENCODER', 'VIEWER'] },
+    { name: 'Inventory', path: '/inventory', icon: Package, roles: ['ADMIN', 'STAFF', 'ENCODER', 'VIEWER'] },
+    { name: 'Recipients', path: '/recipients', icon: Users, roles: ['ADMIN', 'STAFF', 'ENCODER', 'VIEWER'] },
+    { name: 'Distribute', path: '/distribute', icon: ClipboardList, roles: ['ADMIN', 'STAFF', 'ENCODER'] },
+    { name: 'Distribution Log', path: '/logs', icon: FileText, roles: ['ADMIN', 'STAFF', 'ENCODER', 'VIEWER'] },
+    { name: 'Reports', path: '/reports', icon: FileText, roles: ['ADMIN', 'STAFF', 'VIEWER'] },
+    { name: 'User Management', path: '/users', icon: Settings, roles: ['ADMIN'] },
   ];
+
+  const filteredNavItems = navItems.filter(item => item.roles.includes(user?.role as string));
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -73,7 +75,7 @@ export default function Layout() {
           </div>
 
           <nav className="space-y-1">
-            {navItems.map((item) => (
+            {filteredNavItems.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.path}
