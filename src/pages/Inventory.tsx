@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { InventoryItem, InventoryCategory } from '../types';
-import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const CATEGORIES: { value: InventoryCategory; label: string }[] = [
@@ -208,8 +208,9 @@ export default function Inventory() {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                             OUT OF STOCK
                           </span>
-                        ) : item.quantity <= 20 ? (
+                        ) : item.quantity <= 10 ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
                             LOW STOCK
                           </span>
                         ) : (

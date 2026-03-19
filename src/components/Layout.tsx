@@ -37,7 +37,7 @@ export default function Layout() {
     { name: 'Distribute', path: '/distribute', icon: ClipboardList },
     { name: 'Distribution Log', path: '/logs', icon: FileText },
     { name: 'Reports', path: '/reports', icon: FileText },
-    ...(user?.role === 'ADMIN' ? [{ name: 'User Management', path: '/users', icon: Settings }] : []),
+    { name: 'User Management', path: '/users', icon: Settings },
   ];
 
   return (

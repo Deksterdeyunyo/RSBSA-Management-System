@@ -53,7 +53,7 @@ export default function App() {
             <Route path="logs" element={<DistributionLog />} />
             <Route path="reports" element={<Reports />} />
             <Route path="users" element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
+              <ProtectedRoute>
                 <UserManagement />
               </ProtectedRoute>
             } />

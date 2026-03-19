@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, Role } from '../types';
 import { Plus, Edit2, Trash2, X, Shield } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UserManagement() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -158,6 +160,15 @@ export default function UserManagement() {
     setIsModalOpen(true);
   };
 
+  const canAddUser = currentUser?.role === 'ADMIN';
+  const canDeleteUser = currentUser?.role === 'ADMIN';
+  const canChangeRole = currentUser?.role === 'ADMIN';
+  
+  const canEditUser = (targetUser: User) => {
+    if (currentUser?.role === 'ADMIN') return true;
+    return currentUser?.id === targetUser.id;
+  };
+
   const roleColors: Record<Role, string> = {
     ADMIN: 'bg-red-100 text-red-800',
     STAFF: 'bg-blue-100 text-blue-800',
@@ -172,13 +183,15 @@ export default function UserManagement() {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="mt-1 text-sm text-gray-500">Manage system access and roles</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-        >
-          <Plus className="-ml-1 mr-2 h-5 w-5" />
-          Add User
-        </button>
+        {canAddUser && (
+          <button
+            onClick={() => openModal()}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+          >
+            <Plus className="-ml-1 mr-2 h-5 w-5" />
+            Add User
+          </button>
+        )}
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -211,12 +224,16 @@ export default function UserManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={() => openModal(user)} className="text-emerald-600 hover:text-emerald-900 mr-4">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setUserToDelete(user)} className="text-red-600 hover:text-red-900">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canEditUser(user) && (
+                        <button onClick={() => openModal(user)} className="text-emerald-600 hover:text-emerald-900 mr-4">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canDeleteUser && (
+                        <button onClick={() => setUserToDelete(user)} className="text-red-600 hover:text-red-900">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -286,9 +303,10 @@ export default function UserManagement() {
                       <label className="block text-sm font-medium text-gray-700">Role</label>
                       <select
                         required
+                        disabled={!canChangeRole}
                         value={formData.role}
                         onChange={(e) => setFormData({...formData, role: e.target.value as Role})}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm disabled:bg-gray-100"
                       >
                         <option value="ADMIN">Admin (Full Access)</option>
                         <option value="STAFF">Staff (Manage Inventory & Distribute)</option>
