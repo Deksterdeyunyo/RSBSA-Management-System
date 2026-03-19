@@ -78,3 +78,90 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Enable pgcrypto for password hashing
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Create a secure RPC function to create users without triggering email confirmation
+-- and without logging out the current admin user
+CREATE OR REPLACE FUNCTION public.create_user(
+  user_email TEXT,
+  user_password TEXT,
+  user_name TEXT,
+  user_role user_role
+) RETURNS UUID AS $$
+DECLARE
+  new_user_id UUID;
+BEGIN
+  -- Check if the current user is an admin
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'ADMIN'::user_role
+  ) THEN
+    RAISE EXCEPTION 'Only administrators can create new users';
+  END IF;
+
+  -- Generate a new UUID for the user
+  new_user_id := gen_random_uuid();
+  
+  -- Insert into auth.users
+  INSERT INTO auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at,
+    confirmation_token,
+    email_change,
+    email_change_token_new,
+    recovery_token
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    new_user_id,
+    'authenticated',
+    'authenticated',
+    user_email,
+    crypt(user_password, gen_salt('bf')),
+    NOW(),
+    '{"provider":"email","providers":["email"]}',
+    jsonb_build_object('full_name', user_name),
+    NOW(),
+    NOW(),
+    '',
+    '',
+    '',
+    ''
+  );
+
+  -- The trigger on_auth_user_created will automatically create the profile
+  -- But we want to set the specific role, so we update it
+  UPDATE public.profiles
+  SET role = user_role
+  WHERE id = new_user_id;
+
+  RETURN new_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create a secure RPC function to delete users completely
+CREATE OR REPLACE FUNCTION public.delete_user(user_id UUID)
+RETURNS void AS $$
+BEGIN
+  -- Check if the current user is an admin
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'ADMIN'::user_role
+  ) THEN
+    RAISE EXCEPTION 'Only administrators can delete users';
+  END IF;
+
+  -- Delete the user from auth.users (this will cascade to public.profiles)
+  DELETE FROM auth.users WHERE id = user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

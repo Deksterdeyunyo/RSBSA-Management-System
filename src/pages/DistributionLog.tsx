@@ -89,13 +89,14 @@ export default function DistributionLog() {
     doc.setFontSize(11);
     doc.text(`Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`, 14, 30);
     
-    const tableColumn = ["Date", "Recipient", "RSBSA No.", "Item", "Qty", "Distributor"];
+    const tableColumn = ["Date", "Recipient", "RSBSA No.", "Item", "Qty", "Unit", "Distributor"];
     const tableRows = filteredLogs.map(log => [
       format(new Date(log.date_distributed), 'yyyy-MM-dd'),
       `${log.recipient?.last_name}, ${log.recipient?.first_name}`,
       log.recipient?.rsbsa_number || '',
       log.inventory?.name || '',
-      `${log.quantity} ${log.inventory?.unit || ''}`,
+      log.quantity,
+      log.inventory?.unit || '',
       log.distributor?.name || ''
     ]);
 
@@ -186,13 +187,14 @@ export default function DistributionLog() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distributed By</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
                       No distribution logs found
                     </td>
                   </tr>
@@ -213,7 +215,10 @@ export default function DistributionLog() {
                         <div className="text-xs text-gray-500">{log.inventory?.category}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {log.quantity} {log.inventory?.unit}
+                        {log.quantity}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {log.inventory?.unit}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.distributor?.name}

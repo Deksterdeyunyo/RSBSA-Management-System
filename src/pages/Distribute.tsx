@@ -287,7 +287,7 @@ export default function Distribute() {
                   <option value="">Select an item...</option>
                   {inventory.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name} ({item.quantity} {item.unit} available)
+                      {item.name} - {item.unit} ({item.quantity} available)
                     </option>
                   ))}
                 </select>
@@ -295,15 +295,24 @@ export default function Distribute() {
 
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  max={selectedItem ? inventory.find(i => i.id === selectedItem)?.quantity : undefined}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                />
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    max={selectedItem ? inventory.find(i => i.id === selectedItem)?.quantity : undefined}
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm pr-16"
+                  />
+                  {selectedItem && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 sm:text-sm truncate max-w-[4rem]">
+                        {inventory.find(i => i.id === selectedItem)?.unit}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="sm:col-span-1">
@@ -327,6 +336,7 @@ export default function Distribute() {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
                   </thead>
@@ -334,7 +344,8 @@ export default function Distribute() {
                     {distributionItems.map((item, index) => (
                       <tr key={index}>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.quantity} {item.unit}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                         <td className="px-4 py-3 text-right text-sm font-medium">
                           <button
                             type="button"

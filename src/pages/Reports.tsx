@@ -64,10 +64,10 @@ export default function Reports() {
         if (error) throw error;
         setData(recData || []);
       } else if (reportType === 'summary') {
-        // Group distributions by category
+        // Group distributions by category, item name, and unit
         let query = supabase
           .from('distributions')
-          .select('quantity, inventory!inner(category, name), recipients!inner(barangay)');
+          .select('quantity, inventory!inner(category, name, unit), recipients!inner(barangay)');
           
         if (selectedCategory) {
           query = query.eq('inventory.category', selectedCategory);
@@ -80,13 +80,25 @@ export default function Reports() {
         if (error) throw error;
         
         // Aggregate data
-        const summary: Record<string, number> = {};
+        const summary: Record<string, any> = {};
         (distData || []).forEach((d: any) => {
-          const cat = d.inventory?.category || 'UNKNOWN';
-          summary[cat] = (summary[cat] || 0) + d.quantity;
+          const inv = d.inventory;
+          const key = `${inv.category}_${inv.name}_${inv.unit}`;
+          if (!summary[key]) {
+            summary[key] = {
+              category: inv.category,
+              name: inv.name,
+              unit: inv.unit,
+              total: 0
+            };
+          }
+          summary[key].total += d.quantity;
         });
         
-        setData(Object.entries(summary).map(([category, total]) => ({ category, total })));
+        setData(Object.values(summary).sort((a: any, b: any) => {
+          if (a.category !== b.category) return a.category.localeCompare(b.category);
+          return a.name.localeCompare(b.name);
+        }));
       } else if (reportType === 'recipient_distributions') {
         let query = supabase
           .from('distributions')
@@ -169,11 +181,11 @@ export default function Reports() {
       head = [['RSBSA No.', 'Name', 'Barangay', 'Municipality', 'Farm Area (ha)']];
       body = data.map(item => [item.rsbsa_number, `${item.last_name}, ${item.first_name}`, item.barangay, item.municipality, item.farm_area_hectares]);
     } else if (reportType === 'summary') {
-      head = [['Category', 'Total Distributed Quantity']];
-      body = data.map(item => [item.category, item.total]);
+      head = [['Category', 'Item Name', 'Unit', 'Total Distributed Quantity']];
+      body = data.map(item => [item.category, item.name, item.unit, item.total]);
     } else if (reportType === 'recipient_distributions') {
-      head = [['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty']];
-      body = data.map(item => [item.rsbsa_number, item.name, item.barangay, item.category, item.item_name, `${item.total_quantity} ${item.unit}`]);
+      head = [['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty', 'Unit']];
+      body = data.map(item => [item.rsbsa_number, item.name, item.barangay, item.category, item.item_name, item.total_quantity, item.unit]);
     }
 
     autoTable(doc, {
@@ -198,11 +210,11 @@ export default function Reports() {
       headers = ['RSBSA No.', 'Name', 'Barangay', 'Municipality', 'Farm Area (ha)'];
       csvData = data.map(item => [item.rsbsa_number, `"${item.last_name}, ${item.first_name}"`, `"${item.barangay}"`, `"${item.municipality}"`, item.farm_area_hectares]);
     } else if (reportType === 'summary') {
-      headers = ['Category', 'Total Distributed Quantity'];
-      csvData = data.map(item => [item.category, item.total]);
+      headers = ['Category', 'Item Name', 'Unit', 'Total Distributed Quantity'];
+      csvData = data.map(item => [item.category, `"${item.name}"`, `"${item.unit}"`, item.total]);
     } else if (reportType === 'recipient_distributions') {
-      headers = ['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty'];
-      csvData = data.map(item => [item.rsbsa_number, `"${item.name}"`, `"${item.barangay}"`, item.category, `"${item.item_name}"`, `${item.total_quantity} ${item.unit}`]);
+      headers = ['RSBSA No.', 'Name', 'Barangay', 'Category', 'Item Name', 'Total Qty', 'Unit'];
+      csvData = data.map(item => [item.rsbsa_number, `"${item.name}"`, `"${item.barangay}"`, item.category, `"${item.item_name}"`, item.total_quantity, `"${item.unit}"`]);
     }
 
     const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
@@ -387,7 +399,8 @@ export default function Reports() {
                       <>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       </>
                     )}
                     {reportType === 'recipients' && (
@@ -400,6 +413,8 @@ export default function Reports() {
                     {reportType === 'summary' && (
                       <>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Distributed</th>
                       </>
                     )}
@@ -409,6 +424,7 @@ export default function Reports() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Barangay</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       </>
                     )}
                   </tr>
@@ -420,7 +436,8 @@ export default function Reports() {
                         <>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">{item.category}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.quantity} {item.unit}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                         </>
                       )}
                       {reportType === 'recipients' && (
@@ -433,6 +450,8 @@ export default function Reports() {
                       {reportType === 'summary' && (
                         <>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.category}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{item.total}</td>
                         </>
                       )}
@@ -444,7 +463,8 @@ export default function Reports() {
                             <div className="font-medium">{item.item_name}</div>
                             <div className="text-xs text-gray-500">{item.category}</div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{item.total_quantity} {item.unit}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{item.total_quantity}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                         </>
                       )}
                     </tr>
