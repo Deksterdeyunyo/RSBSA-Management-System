@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Package, Users, ClipboardList, TrendingUp } from 'lucide-react';
+import ClockWidget from '../components/ClockWidget';
+import CalendarWidget from '../components/CalendarWidget';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -104,31 +106,38 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Distributions</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {stats.recentDistributions.map((dist: any) => (
-                <tr key={dist.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.date}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dist.recipient}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.item}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.qty}</td>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white shadow rounded-lg flex flex-col">
+          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Distributions</h3>
+          </div>
+          <div className="overflow-x-auto flex-1">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.recentDistributions.map((dist: any) => (
+                  <tr key={dist.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dist.recipient}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.item}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <ClockWidget />
+          <CalendarWidget />
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { InventoryItem, InventoryCategory } from '../types';
-import { Plus, Search, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Mail, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const CATEGORIES: { value: InventoryCategory; label: string }[] = [
@@ -19,6 +19,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -120,11 +121,54 @@ export default function Inventory() {
     setIsModalOpen(true);
   };
 
+  const handleSendAlert = (item: InventoryItem) => {
+    const subject = encodeURIComponent(`Low Stock Alert: ${item.name}`);
+    const body = encodeURIComponent(`Hello,\n\nThis is an automated alert that the inventory for "${item.name}" has fallen to ${item.quantity} ${item.unit}.\n\nPlease restock soon.\n\nSystem Administrator`);
+    window.location.href = `mailto:admin@mao.gov.ph?subject=${subject}&body=${body}`;
+  };
+
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = categoryFilter ? item.category === categoryFilter : true;
     return matchesSearch && matchesCategory;
   });
+
+  const exportToCSV = () => {
+    const headers = ['Item Name', 'Category', 'Status', 'Quantity', 'Unit'];
+    
+    const csvRows = filteredItems.map(item => {
+      const categoryLabel = CATEGORIES.find(c => c.value === item.category)?.label || item.category;
+      
+      let status = 'IN STOCK';
+      if (item.quantity <= 0) {
+        status = 'OUT OF STOCK';
+      } else if (item.quantity <= lowStockThreshold) {
+        status = 'LOW STOCK';
+      }
+
+      const escapeCsv = (str: string | number) => `"${String(str).replace(/"/g, '""')}"`;
+
+      return [
+        escapeCsv(item.name),
+        escapeCsv(categoryLabel),
+        escapeCsv(status),
+        escapeCsv(item.quantity),
+        escapeCsv(item.unit)
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
@@ -133,15 +177,24 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="mt-1 text-sm text-gray-500">Manage seeds, fertilizers, and other supplies</p>
         </div>
-        {canEdit && (
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
-            onClick={() => openModal()}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+            onClick={exportToCSV}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
           >
-            <Plus className="-ml-1 mr-2 h-5 w-5" />
-            Add Item
+            <Download className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
+            Export CSV
           </button>
-        )}
+          {canEdit && (
+            <button
+              onClick={() => openModal()}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+            >
+              <Plus className="-ml-1 mr-2 h-5 w-5" />
+              Add Item
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg p-4 sm:p-6">
@@ -170,6 +223,16 @@ export default function Inventory() {
               ))}
             </select>
           </div>
+          <div className="sm:w-48 flex items-center space-x-2">
+            <label className="text-sm text-gray-700 whitespace-nowrap">Alert Threshold:</label>
+            <input
+              type="number"
+              min="0"
+              value={lowStockThreshold}
+              onChange={(e) => setLowStockThreshold(Number(e.target.value))}
+              className="block w-20 pl-3 pr-2 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -196,7 +259,7 @@ export default function Inventory() {
                   </tr>
                 ) : (
                   filteredItems.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className={item.quantity <= lowStockThreshold ? "bg-red-50/50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
@@ -208,7 +271,7 @@ export default function Inventory() {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                             OUT OF STOCK
                           </span>
-                        ) : item.quantity <= 10 ? (
+                        ) : item.quantity <= lowStockThreshold ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                             <AlertTriangle className="w-3 h-3 mr-1" />
                             LOW STOCK
@@ -219,14 +282,32 @@ export default function Inventory() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{item.quantity}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                        {item.quantity <= lowStockThreshold ? (
+                          <span className="flex items-center text-red-600">
+                            <AlertTriangle className="w-4 h-4 mr-1.5" />
+                            {item.quantity}
+                          </span>
+                        ) : (
+                          <span className="text-gray-900">{item.quantity}</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.unit}</td>
                       {canEdit && (
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => openModal(item)} className="text-emerald-600 hover:text-emerald-900 mr-4">
+                          {item.quantity <= lowStockThreshold && (
+                            <button 
+                              onClick={() => handleSendAlert(item)} 
+                              className="text-amber-600 hover:text-amber-900 mr-4"
+                              title="Send Low Stock Alert"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button onClick={() => openModal(item)} className="text-emerald-600 hover:text-emerald-900 mr-4" title="Edit Item">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => setItemToDelete(item)} className="text-red-600 hover:text-red-900">
+                          <button onClick={() => setItemToDelete(item)} className="text-red-600 hover:text-red-900" title="Delete Item">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
