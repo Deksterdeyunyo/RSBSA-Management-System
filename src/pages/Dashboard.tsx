@@ -33,7 +33,7 @@ export default function Dashboard() {
             date_distributed,
             quantity,
             recipients (first_name, last_name),
-            inventory (name)
+            inventory (name, batch_number, expiration_date)
           `)
           .order('date_distributed', { ascending: false })
           .limit(5);
@@ -87,6 +87,8 @@ export default function Dashboard() {
               date: new Date(d.date_distributed).toLocaleDateString(),
               recipient: `${d.recipients?.first_name || ''} ${d.recipients?.last_name || ''}`.trim(),
               item: d.inventory?.name || 'Unknown Item',
+              batch_number: d.inventory?.batch_number,
+              expiration_date: d.inventory?.expiration_date,
               qty: d.quantity
             })),
             chartData
@@ -190,6 +192,7 @@ export default function Dashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch / Exp</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                 </tr>
               </thead>
@@ -199,6 +202,11 @@ export default function Dashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dist.recipient}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.item}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {dist.batch_number && <div className="font-medium text-gray-900">Batch: {dist.batch_number}</div>}
+                      {dist.expiration_date && <div className="text-xs">Exp: {new Date(dist.expiration_date).toLocaleDateString()}</div>}
+                      {!dist.batch_number && !dist.expiration_date && <span className="text-gray-400">-</span>}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dist.qty}</td>
                   </tr>
                 ))}

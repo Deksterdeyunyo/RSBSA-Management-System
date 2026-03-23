@@ -175,8 +175,14 @@ export default function Reports() {
     let body: any[][] = [];
 
     if (reportType === 'inventory') {
-      head = [['Item Name', 'Category', 'Quantity', 'Unit']];
-      body = data.map(item => [item.name, item.category, item.quantity, item.unit]);
+      head = [['Item Name', 'Category', 'Batch / Exp', 'Quantity', 'Unit']];
+      body = data.map(item => [
+        item.name, 
+        item.category, 
+        `${item.batch_number ? 'B: ' + item.batch_number : ''} ${item.expiration_date ? 'E: ' + new Date(item.expiration_date).toLocaleDateString() : ''}`.trim() || '-',
+        item.quantity, 
+        item.unit
+      ]);
     } else if (reportType === 'recipients') {
       head = [['RSBSA No.', 'Name', 'Barangay', 'Municipality', 'Farm Area (ha)']];
       body = data.map(item => [item.rsbsa_number, `${item.last_name}, ${item.first_name}`, item.barangay, item.municipality, item.farm_area_hectares]);
@@ -204,8 +210,8 @@ export default function Reports() {
     let csvData: any[][] = [];
 
     if (reportType === 'inventory') {
-      headers = ['Item Name', 'Category', 'Quantity', 'Unit'];
-      csvData = data.map(item => [`"${item.name}"`, item.category, item.quantity, item.unit]);
+      headers = ['Item Name', 'Category', 'Batch Number', 'Expiration Date', 'Quantity', 'Unit'];
+      csvData = data.map(item => [`"${item.name}"`, item.category, `"${item.batch_number || ''}"`, `"${item.expiration_date || ''}"`, item.quantity, item.unit]);
     } else if (reportType === 'recipients') {
       headers = ['RSBSA No.', 'Name', 'Barangay', 'Municipality', 'Farm Area (ha)'];
       csvData = data.map(item => [item.rsbsa_number, `"${item.last_name}, ${item.first_name}"`, `"${item.barangay}"`, `"${item.municipality}"`, item.farm_area_hectares]);
@@ -399,6 +405,7 @@ export default function Reports() {
                       <>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch / Exp</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       </>
@@ -436,6 +443,11 @@ export default function Reports() {
                         <>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">{item.category}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {item.batch_number && <div className="font-medium text-gray-900">Batch: {item.batch_number}</div>}
+                            {item.expiration_date && <div className="text-xs">Exp: {new Date(item.expiration_date).toLocaleDateString()}</div>}
+                            {!item.batch_number && !item.expiration_date && <span className="text-gray-400">-</span>}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                         </>

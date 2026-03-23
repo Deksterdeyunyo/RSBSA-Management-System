@@ -108,7 +108,7 @@ export default function Recipients() {
           id,
           date_distributed,
           quantity,
-          inventory (name, category, unit)
+          inventory (name, category, unit, batch_number, expiration_date)
         `)
         .eq('recipient_id', item.id)
         .order('date_distributed', { ascending: false });
@@ -463,6 +463,7 @@ export default function Recipients() {
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch / Exp</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                           </tr>
@@ -475,6 +476,11 @@ export default function Recipients() {
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                 {record.inventory?.name || 'Unknown Item'}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                {record.inventory?.batch_number && <div className="font-medium text-gray-900">Batch: {record.inventory.batch_number}</div>}
+                                {record.inventory?.expiration_date && <div className="text-xs">Exp: {new Date(record.inventory.expiration_date).toLocaleDateString()}</div>}
+                                {!record.inventory?.batch_number && !record.inventory?.expiration_date && <span className="text-gray-400">-</span>}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                                 {record.inventory?.category || 'N/A'}

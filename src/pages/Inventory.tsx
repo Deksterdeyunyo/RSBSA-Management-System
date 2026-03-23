@@ -63,9 +63,7 @@ export default function Inventory() {
     try {
       const payload = {
         ...formData,
-        quantity: Number(formData.quantity) || 0,
-        batch_number: formData.batch_number || null,
-        expiration_date: formData.expiration_date || null
+        quantity: Number(formData.quantity) || 0
       };
       
       if (editingItem) {
@@ -142,7 +140,7 @@ export default function Inventory() {
   });
 
   const exportToCSV = () => {
-    const headers = ['Item Name', 'Category', 'Status', 'Quantity', 'Unit', 'Batch Number', 'Expiration Date'];
+    const headers = ['Item Name', 'Category', 'Status', 'Quantity', 'Unit', 'Batch No.', 'Exp. Date'];
     
     const csvRows = filteredItems.map(item => {
       const categoryLabel = CATEGORIES.find(c => c.value === item.category)?.label || item.category;
@@ -154,7 +152,7 @@ export default function Inventory() {
         status = 'LOW STOCK';
       }
 
-      const escapeCsv = (str: string | number) => `"${String(str).replace(/"/g, '""')}"`;
+      const escapeCsv = (str: string | number | undefined | null) => `"${String(str || '').replace(/"/g, '""')}"`;
 
       return [
         escapeCsv(item.name),
@@ -162,8 +160,8 @@ export default function Inventory() {
         escapeCsv(status),
         escapeCsv(item.quantity),
         escapeCsv(item.unit),
-        escapeCsv(item.batch_number || ''),
-        escapeCsv(item.expiration_date || '')
+        escapeCsv(item.batch_number),
+        escapeCsv(item.expiration_date)
       ].join(',');
     });
 
@@ -253,8 +251,8 @@ export default function Inventory() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch / Exp</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch / Exp</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
@@ -264,7 +262,7 @@ export default function Inventory() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={canEdit ? 6 : 5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={canEdit ? 7 : 6} className="px-6 py-4 text-center text-sm text-gray-500">
                       No items found
                     </td>
                   </tr>
@@ -273,14 +271,14 @@ export default function Inventory() {
                     <tr key={item.id} className={item.quantity <= lowStockThreshold ? "bg-red-50/50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.batch_number && <div className="text-gray-900">Batch: {item.batch_number}</div>}
-                        {item.expiration_date && <div className="text-xs">Exp: {item.expiration_date}</div>}
-                        {!item.batch_number && !item.expiration_date && <span className="text-gray-400">-</span>}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                           {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.batch_number && <div className="font-medium text-gray-900">Batch: {item.batch_number}</div>}
+                        {item.expiration_date && <div className="text-xs">Exp: {new Date(item.expiration_date).toLocaleDateString()}</div>}
+                        {!item.batch_number && !item.expiration_date && <span className="text-gray-400">-</span>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {item.quantity <= 0 ? (
@@ -415,7 +413,6 @@ export default function Inventory() {
                           value={formData.batch_number}
                           onChange={(e) => setFormData({...formData, batch_number: e.target.value})}
                           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                          placeholder="e.g., BATCH-001"
                         />
                       </div>
                       <div>

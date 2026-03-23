@@ -141,6 +141,25 @@ BEGIN
     ''
   );
 
+  -- Insert their identity so they can log in with email/password
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  ) VALUES (
+    gen_random_uuid(),
+    new_user_id,
+    format('{"sub":"%s","email":"%s"}', new_user_id::text, user_email)::jsonb,
+    'email',
+    NOW(),
+    NOW(),
+    NOW()
+  );
+
   -- The trigger on_auth_user_created will automatically create the profile
   -- But we want to set the specific role, so we update it
   UPDATE public.profiles

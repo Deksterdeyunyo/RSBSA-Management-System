@@ -310,7 +310,7 @@ export default function Distribute() {
                   <option value="">Select an item...</option>
                   {inventory.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name} {item.batch_number ? `(Batch: ${item.batch_number})` : ''} {item.expiration_date ? `[Exp: ${item.expiration_date}]` : ''} - {item.unit} ({item.quantity} available)
+                      {item.name} - {item.unit} ({item.quantity} available) {item.batch_number ? `[Batch: ${item.batch_number}]` : ''}
                     </option>
                   ))}
                 </select>
@@ -358,7 +358,7 @@ export default function Distribute() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch/Exp</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch / Exp</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -369,9 +369,9 @@ export default function Distribute() {
                       <tr key={index}>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
-                          {item.batch_number && <div>Batch: {item.batch_number}</div>}
-                          {item.expiration_date && <div className="text-xs">Exp: {item.expiration_date}</div>}
-                          {!item.batch_number && !item.expiration_date && '-'}
+                          {item.batch_number && <div className="font-medium text-gray-900">Batch: {item.batch_number}</div>}
+                          {item.expiration_date && <div className="text-xs">Exp: {new Date(item.expiration_date).toLocaleDateString()}</div>}
+                          {!item.batch_number && !item.expiration_date && <span className="text-gray-400">-</span>}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
