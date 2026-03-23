@@ -16,8 +16,9 @@ export default function Distribute() {
   const [selectedItem, setSelectedItem] = useState('');
   const [quantity, setQuantity] = useState<string | number>('');
   const [remarks, setRemarks] = useState('');
+  const [distributorName, setDistributorName] = useState('');
   
-  const [distributionItems, setDistributionItems] = useState<{inventory_id: string, name: string, quantity: number, unit: string, maxQty: number}[]>([]);
+  const [distributionItems, setDistributionItems] = useState<{inventory_id: string, name: string, quantity: number, unit: string, maxQty: number, batch_number?: string, expiration_date?: string}[]>([]);
   
   const [submitting, setSubmitting] = useState(false);
 
@@ -86,7 +87,9 @@ export default function Distribute() {
         name: item.name,
         quantity: numQuantity,
         unit: item.unit,
-        maxQty: item.quantity
+        maxQty: item.quantity,
+        batch_number: item.batch_number,
+        expiration_date: item.expiration_date
       }]);
     }
 
@@ -111,6 +114,25 @@ export default function Distribute() {
     if (distributionItems.length === 0) {
       alert('Please add at least one item to distribute.');
       return;
+    }
+
+    // Sanitize and validate remarks
+    const sanitizedRemarks = remarks.trim().replace(/<[^>]*>?/gm, ''); // Basic HTML tag removal
+    if (sanitizedRemarks.length > 500) {
+      alert('Remarks cannot exceed 500 characters.');
+      return;
+    }
+
+    // Sanitize and validate distributor name
+    const sanitizedDistributorName = distributorName.trim().replace(/<[^>]*>?/gm, '');
+    if (sanitizedDistributorName.length > 100) {
+      alert('Distributor name cannot exceed 100 characters.');
+      return;
+    }
+
+    let finalRemarks = sanitizedRemarks;
+    if (sanitizedDistributorName) {
+      finalRemarks = `Distributor: ${sanitizedDistributorName}${sanitizedRemarks ? '\n' + sanitizedRemarks : ''}`;
     }
 
     setSubmitting(true);
@@ -142,7 +164,7 @@ export default function Distribute() {
         quantity: item.quantity,
         date_distributed: dateDistributed,
         distributed_by: user?.id,
-        remarks
+        remarks: finalRemarks
       }));
 
       // 1. Record distributions
@@ -173,6 +195,7 @@ export default function Distribute() {
       setSelectedItem('');
       setQuantity('');
       setRemarks('');
+      setDistributorName('');
       setDistributionItems([]);
       
       // Refresh data
@@ -287,7 +310,7 @@ export default function Distribute() {
                   <option value="">Select an item...</option>
                   {inventory.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name} - {item.unit} ({item.quantity} available)
+                      {item.name} {item.batch_number ? `(Batch: ${item.batch_number})` : ''} {item.expiration_date ? `[Exp: ${item.expiration_date}]` : ''} - {item.unit} ({item.quantity} available)
                     </option>
                   ))}
                 </select>
@@ -335,6 +358,7 @@ export default function Distribute() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch/Exp</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -344,6 +368,11 @@ export default function Distribute() {
                     {distributionItems.map((item, index) => (
                       <tr key={index}>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {item.batch_number && <div>Batch: {item.batch_number}</div>}
+                          {item.expiration_date && <div className="text-xs">Exp: {item.expiration_date}</div>}
+                          {!item.batch_number && !item.expiration_date && '-'}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{item.quantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{item.unit}</td>
                         <td className="px-4 py-3 text-right text-sm font-medium">
@@ -364,6 +393,18 @@ export default function Distribute() {
 
             <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div className="sm:col-span-6">
+                <label className="block text-sm font-medium text-gray-700">Name of Distributor (Optional)</label>
+                <input
+                  type="text"
+                  value={distributorName}
+                  onChange={(e) => setDistributorName(e.target.value)}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  placeholder="Enter the name of the person distributing the items"
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="sm:col-span-6">
                 <label className="block text-sm font-medium text-gray-700">Remarks (Optional)</label>
                 <textarea
                   rows={2}
@@ -371,7 +412,11 @@ export default function Distribute() {
                   onChange={(e) => setRemarks(e.target.value)}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                   placeholder="Any additional notes..."
+                  maxLength={500}
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  {remarks.length}/500 characters
+                </p>
               </div>
             </div>
           </div>

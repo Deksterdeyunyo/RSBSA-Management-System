@@ -16,6 +16,8 @@ export interface InventoryItem {
   category: InventoryCategory;
   quantity: number;
   unit: string;
+  batch_number?: string;
+  expiration_date?: string;
   description?: string;
   created_at: string;
   updated_at: string;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Package, Users, ClipboardList, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ClockWidget from '../components/ClockWidget';
 import CalendarWidget from '../components/CalendarWidget';
 
@@ -9,7 +10,8 @@ export default function Dashboard() {
     totalInventory: 0,
     totalRecipients: 0,
     totalDistributions: 0,
-    recentDistributions: []
+    recentDistributions: [],
+    chartData: [] as any[]
   });
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +37,45 @@ export default function Dashboard() {
           `)
           .order('date_distributed', { ascending: false })
           .limit(5);
+
+        const { data: distData } = await supabase
+          .from('distributions')
+          .select(`
+            date_distributed,
+            inventory (category)
+          `);
+
+        const monthlyData: Record<string, any> = {};
+
+        distData?.forEach((d: any) => {
+          const date = new Date(d.date_distributed);
+          const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const category = d.inventory?.category || 'UNKNOWN';
+
+          if (!monthlyData[monthYear]) {
+            monthlyData[monthYear] = { 
+              name: monthYear, 
+              SEEDS: 0, 
+              FERTILIZER_ORGANIC: 0, 
+              FERTILIZER_INORGANIC: 0, 
+              DEWORMING: 0, 
+              ANTI_RABIES: 0, 
+              PESTICIDES: 0, 
+              UNKNOWN: 0 
+            };
+          }
+          
+          monthlyData[monthYear][category] += 1;
+        });
+
+        const chartData = Object.values(monthlyData).sort((a, b) => a.name.localeCompare(b.name)).map(d => {
+          const [year, month] = d.name.split('-');
+          const date = new Date(parseInt(year), parseInt(month) - 1);
+          return {
+            ...d,
+            name: date.toLocaleDateString('default', { month: 'short', year: 'numeric' })
+          };
+        });
         
         if (inventoryCount !== null) {
           setStats({
@@ -47,7 +88,8 @@ export default function Dashboard() {
               recipient: `${d.recipients?.first_name || ''} ${d.recipients?.last_name || ''}`.trim(),
               item: d.inventory?.name || 'Unknown Item',
               qty: d.quantity
-            }))
+            })),
+            chartData
           });
           return;
         }
@@ -59,7 +101,8 @@ export default function Dashboard() {
         totalInventory: 0,
         totalRecipients: 0,
         totalDistributions: 0,
-        recentDistributions: []
+        recentDistributions: [],
+        chartData: []
       });
     } finally {
       setLoading(false);
@@ -79,9 +122,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Overview of MAO RSBSA System</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+        <div className="lg:col-span-2">
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Overview of MAO RSBSA System</p>
+        </div>
+        <div>
+          <ClockWidget />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -104,6 +152,30 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Monthly Distributions by Category</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={stats.chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280' }} dx={-10} />
+              <Tooltip 
+                cursor={{ fill: '#f3f4f6' }}
+                contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
+              />
+              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              <Bar dataKey="SEEDS" name="Seeds" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="FERTILIZER_ORGANIC" name="Organic Fertilizer" stackId="a" fill="#8b5cf6" />
+              <Bar dataKey="FERTILIZER_INORGANIC" name="Inorganic Fertilizer" stackId="a" fill="#3b82f6" />
+              <Bar dataKey="DEWORMING" name="Deworming" stackId="a" fill="#f59e0b" />
+              <Bar dataKey="ANTI_RABIES" name="Anti-Rabies" stackId="a" fill="#ef4444" />
+              <Bar dataKey="PESTICIDES" name="Pesticides" stackId="a" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,7 +208,6 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-6">
-          <ClockWidget />
           <CalendarWidget />
         </div>
       </div>

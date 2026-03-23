@@ -18,6 +18,8 @@ CREATE TABLE inventory (
   category inventory_category NOT NULL,
   quantity NUMERIC NOT NULL DEFAULT 0,
   unit TEXT NOT NULL,
+  batch_number TEXT,
+  expiration_date DATE,
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL

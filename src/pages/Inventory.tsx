@@ -29,6 +29,8 @@ export default function Inventory() {
     category: 'SEEDS' as InventoryCategory,
     quantity: '' as string | number,
     unit: 'bags',
+    batch_number: '',
+    expiration_date: '',
     description: ''
   });
 
@@ -61,7 +63,9 @@ export default function Inventory() {
     try {
       const payload = {
         ...formData,
-        quantity: Number(formData.quantity) || 0
+        quantity: Number(formData.quantity) || 0,
+        batch_number: formData.batch_number || null,
+        expiration_date: formData.expiration_date || null
       };
       
       if (editingItem) {
@@ -106,6 +110,8 @@ export default function Inventory() {
         category: item.category,
         quantity: item.quantity,
         unit: item.unit,
+        batch_number: item.batch_number || '',
+        expiration_date: item.expiration_date || '',
         description: item.description || ''
       });
     } else {
@@ -115,6 +121,8 @@ export default function Inventory() {
         category: 'SEEDS',
         quantity: '',
         unit: 'bags',
+        batch_number: '',
+        expiration_date: '',
         description: ''
       });
     }
@@ -134,7 +142,7 @@ export default function Inventory() {
   });
 
   const exportToCSV = () => {
-    const headers = ['Item Name', 'Category', 'Status', 'Quantity', 'Unit'];
+    const headers = ['Item Name', 'Category', 'Status', 'Quantity', 'Unit', 'Batch Number', 'Expiration Date'];
     
     const csvRows = filteredItems.map(item => {
       const categoryLabel = CATEGORIES.find(c => c.value === item.category)?.label || item.category;
@@ -153,7 +161,9 @@ export default function Inventory() {
         escapeCsv(categoryLabel),
         escapeCsv(status),
         escapeCsv(item.quantity),
-        escapeCsv(item.unit)
+        escapeCsv(item.unit),
+        escapeCsv(item.batch_number || ''),
+        escapeCsv(item.expiration_date || '')
       ].join(',');
     });
 
@@ -243,6 +253,7 @@ export default function Inventory() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch / Exp</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
@@ -261,6 +272,11 @@ export default function Inventory() {
                   filteredItems.map((item) => (
                     <tr key={item.id} className={item.quantity <= lowStockThreshold ? "bg-red-50/50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.batch_number && <div className="text-gray-900">Batch: {item.batch_number}</div>}
+                        {item.expiration_date && <div className="text-xs">Exp: {item.expiration_date}</div>}
+                        {!item.batch_number && !item.expiration_date && <span className="text-gray-400">-</span>}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                           {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
@@ -386,6 +402,28 @@ export default function Inventory() {
                           required
                           value={formData.unit}
                           onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Batch Number (Optional)</label>
+                        <input
+                          type="text"
+                          value={formData.batch_number}
+                          onChange={(e) => setFormData({...formData, batch_number: e.target.value})}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                          placeholder="e.g., BATCH-001"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Expiration Date (Optional)</label>
+                        <input
+                          type="date"
+                          value={formData.expiration_date}
+                          onChange={(e) => setFormData({...formData, expiration_date: e.target.value})}
                           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                         />
                       </div>

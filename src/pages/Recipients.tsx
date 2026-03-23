@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Recipient } from '../types';
-import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Recipients() {
@@ -11,6 +11,10 @@ export default function Recipients() {
   const [search, setSearch] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState<Recipient | null>(null);
+  const [recipientHistory, setRecipientHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [editingItem, setEditingItem] = useState<Recipient | null>(null);
   const [recipientToDelete, setRecipientToDelete] = useState<Recipient | null>(null);
   const [formData, setFormData] = useState({
@@ -89,6 +93,33 @@ export default function Recipients() {
     } catch (error) {
       console.error('Error deleting recipient:', error);
       alert('Failed to delete recipient.');
+    }
+  };
+
+  const openViewModal = async (item: Recipient) => {
+    setViewingItem(item);
+    setIsViewModalOpen(true);
+    setHistoryLoading(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('distributions')
+        .select(`
+          id,
+          date_distributed,
+          quantity,
+          inventory (name, category, unit)
+        `)
+        .eq('recipient_id', item.id)
+        .order('date_distributed', { ascending: false });
+        
+      if (error) throw error;
+      setRecipientHistory(data || []);
+    } catch (error) {
+      console.error('Error fetching recipient history:', error);
+      setRecipientHistory([]);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -180,13 +211,13 @@ export default function Recipients() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Farm Info</th>
-                  {canEdit && <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredRecipients.length === 0 ? (
                   <tr>
-                    <td colSpan={canEdit ? 5 : 4} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                       No recipients found
                     </td>
                   </tr>
@@ -203,16 +234,21 @@ export default function Recipients() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.farm_area_hectares} ha - {item.commodity}
                       </td>
-                      {canEdit && (
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => openModal(item)} className="text-emerald-600 hover:text-emerald-900 mr-4">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => setRecipientToDelete(item)} className="text-red-600 hover:text-red-900">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => openViewModal(item)} className="text-blue-600 hover:text-blue-900 mr-4" title="View History">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {canEdit && (
+                          <>
+                            <button onClick={() => openModal(item)} className="text-emerald-600 hover:text-emerald-900 mr-4" title="Edit">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setRecipientToDelete(item)} className="text-red-600 hover:text-red-900" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -372,6 +408,99 @@ export default function Recipients() {
             </div>
           </div>
         </div>
+        </div>
+      )}
+
+      {/* View History Modal */}
+      {isViewModalOpen && viewingItem && (
+        <div className="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-gray-500 opacity-75 transition-opacity" onClick={() => setIsViewModalOpen(false)}></div>
+
+          <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Recipient Information & History
+                    </h3>
+                    <button type="button" onClick={() => setIsViewModalOpen(false)} className="text-gray-400 hover:text-gray-500">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="font-medium">{viewingItem.first_name} {viewingItem.middle_name ? viewingItem.middle_name + ' ' : ''}{viewingItem.last_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">RSBSA Number</p>
+                      <p className="font-medium">{viewingItem.rsbsa_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Location</p>
+                      <p className="font-medium">{viewingItem.barangay}, {viewingItem.municipality}, {viewingItem.province}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Farm Info</p>
+                      <p className="font-medium">{viewingItem.farm_area_hectares} ha - {viewingItem.commodity}</p>
+                    </div>
+                  </div>
+
+                  <h4 className="text-md font-medium text-gray-900 mb-3">Distribution History</h4>
+                  
+                  {historyLoading ? (
+                    <div className="text-center py-4 text-sm text-gray-500">Loading history...</div>
+                  ) : recipientHistory.length === 0 ? (
+                    <div className="text-center py-4 text-sm text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                      No distribution records found for this recipient.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-64 overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {recipientHistory.map((record) => (
+                            <tr key={record.id}>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {new Date(record.date_distributed).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {record.inventory?.name || 'Unknown Item'}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                {record.inventory?.category || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {record.quantity} {record.inventory?.unit || ''}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={() => setIsViewModalOpen(false)}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
